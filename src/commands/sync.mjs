@@ -71,6 +71,37 @@ const applyPatch = (root, patch, prev, check) => {
   }
 }
 
+// A target can move its managed block to a different file between versions —
+// CodeBuddy went from settings.json to mcp.json. Entries we wrote into the old
+// file are still ours and still stamped, but the new spec never looks at that
+// file again, so nothing would ever reclaim them. Sweep every file a previous
+// run recorded that we no longer patch. Only `kind: 'json'` patches record a
+// `managed` section, so everything reachable here parses as JSON.
+const sweepMoved = (root, patch, prev, check) =>
+  Object.entries(prev.managed ?? {})
+    .filter(([file]) => file !== patch?.file)
+    .flatMap(([file, keys]) => {
+      const target = join(root, file)
+      const before = readIf(target)
+      if (before === null) return []
+      const after = Object.entries(keys).reduce((acc, [key, names]) => {
+        const section = acc[key]
+        if (!section) return acc
+        // Ours to reclaim only if we still hold the stamp; a name another tool
+        // took over in the meantime stays with them.
+        const kept = Object.fromEntries(
+          Object.entries(section).filter(
+            ([n, cfg]) => !(names.includes(n) && cfg?._managedBy === MANAGED_BY),
+          ),
+        )
+        return { ...acc, [key]: kept }
+      }, JSON.parse(before))
+      const text = JSON.stringify(after, null, 2) + '\n'
+      if (text === before) return []
+      if (!check) write(target, text)
+      return [file]
+    })
+
 // Prune only what a previous run wrote. Files the user added by hand are never
 // touched — this is why we never wipe a target directory wholesale.
 const prune = (root, previous, current, check) => {
@@ -93,6 +124,7 @@ const emit = (adapter, check, stamp, configRoot) => {
   if (!check) changed.forEach(rel => write(join(root, rel), files[rel]))
 
   const patched = applyPatch(root, patch, prev, check)
+  const moved = sweepMoved(root, patch, prev, check)
   const stale = prune(root, prev.files, paths, check)
   // `root` here is the config repo, not the target: it is the only breadcrumb
   // pointing from a rendered tree back to the source, which is what lets an
@@ -106,7 +138,7 @@ const emit = (adapter, check, stamp, configRoot) => {
   return {
     name,
     installed: true,
-    changed: [...changed, ...patched.changed],
+    changed: [...changed, ...patched.changed, ...moved],
     stale,
     dropped,
     backedUp,

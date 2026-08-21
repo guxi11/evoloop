@@ -169,12 +169,17 @@ without writing and always exits 0; `check` is the CI gate that exits 1.
 |---|---|---|---|---|---|---|
 | `claude` | `~/.claude` | `CLAUDE.md` | `skills/` | `commands/` | `agents/` | `settings.json` |
 | `codex` | `~/.codex` | `AGENTS.md` | `skills/` | `prompts/` | — | `config.toml` |
-| `codebuddy` | `~/.codebuddy` | `CODEBUDDY.md` | `skills/` | `commands/` | `agents/` | `mcp.json` |
+| `codebuddy` | `~/.codebuddy`&nbsp;\* | `CODEBUDDY.md` | `skills/` | `commands/` | `agents/` | `mcp.json` |
 | `gemini` | `~/.gemini` | `GEMINI.md` | — | — | — | `settings.json` |
 
 Codex has no notion of slash commands, so reusable prompts are the nearest slot.
 Anything a target has no slot for is reported in the sync output, never silently
 dropped.
+
+\* CodeBuddy shipped as `~/.codebuddy-cli` before `~/.codebuddy`. Roots are a
+candidate list, probed in order — the first that exists wins, so either vintage
+is managed. With both present the newer path is used and the legacy directory is
+left frozen rather than double-managed; delete it once you have migrated.
 
 ## Scoping a doc to some targets
 
