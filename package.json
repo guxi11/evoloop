@@ -1,0 +1,30 @@
+{
+  "name": "evoloop",
+  "version": "0.2.0",
+  "description": "Your config and your agents evolve each other, on a loop. One config repo, rendered into every AI CLI's native layout.",
+  "type": "module",
+  "license": "MIT",
+  "bin": {
+    "evoloop": "bin/evoloop.mjs"
+  },
+  "exports": {
+    ".": "./src/index.mjs",
+    "./adapters": "./src/adapters/index.mjs"
+  },
+  "files": [
+    "bin",
+    "src"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "keywords": [
+    "ai",
+    "agent",
+    "claude-code",
+    "codex",
+    "config",
+    "skills",
+    "mcp"
+  ]
+}
