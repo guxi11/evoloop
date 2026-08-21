@@ -1,6 +1,6 @@
 {
   "name": "evoloop",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "Your config and your agents evolve each other, on a loop. One config repo, rendered into every AI CLI's native layout.",
   "type": "module",
   "license": "MIT",
@@ -22,7 +22,8 @@
   },
   "files": [
     "bin",
-    "src"
+    "src",
+    "skills"
   ],
   "engines": {
     "node": ">=20"

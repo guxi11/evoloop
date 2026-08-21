@@ -3,10 +3,12 @@ import {
   loadConfig, loadIR, specNames,
   sync, report, hasDrift,
   adopt, adoptReport, hasFindings,
+  init, initReport,
 } from '../src/index.mjs'
 
 const USAGE = `evoloop — render one config repo into every AI CLI's native layout
 
+  evoloop init [dir] [--targets a,b]      scaffold a config repo here
   evoloop sync [--only a,b] [--dry-run]   render and install
   evoloop check [--only a,b]              exit 1 on drift (CI / pre-commit)
   evoloop adopt [--only a,b] [--dry-run]  pull untracked target content back in
@@ -15,7 +17,7 @@ const USAGE = `evoloop — render one config repo into every AI CLI's native lay
 `
 
 // Flags that consume the next token when written with a space.
-const VALUED = new Set(['only'])
+const VALUED = new Set(['only', 'targets'])
 
 const parseArgv = argv =>
   argv.reduce(
@@ -42,8 +44,18 @@ const run = async () => {
   if (cmd === 'help' || flags.help) return console.log(USAGE)
 
   const only = list('only')
-  const unknown = only.filter(n => !specNames().includes(n))
+  const chosen = list('targets')
+  const unknown = [...only, ...chosen].filter(n => !specNames().includes(n))
   if (unknown.length) throw new Error(`unknown target(s): ${unknown.join(', ')} — known: ${specNames().join(', ')}`)
+
+  // Scaffolding runs before a config exists, so it never calls loadConfig.
+  if (cmd === 'init') {
+    const check = flags['dry-run'] === true
+    const result = init(positional[1], { targets: chosen.length ? chosen : specNames(), check })
+    console.log(initReport(result, check).join('\n'))
+    if (!check) console.error('\nnext: npx evoloop sync')
+    return
+  }
 
   const config = await loadConfig()
 

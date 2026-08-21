@@ -8,9 +8,10 @@ export const BACKUPS = '.evoloop-backups'
 // everything in a target dir that is NOT listed came from somewhere else.
 // Both directions of the loop hang off that distinction.
 // v1 manifests were a bare array of paths; keep reading them.
+// `root` is the config repo that rendered this tree — absent in older manifests.
 export const readManifest = root => {
   const raw = JSON.parse(readIf(join(root, MANIFEST)) ?? 'null')
   return Array.isArray(raw)
-    ? { files: raw, managed: {} }
-    : { files: raw?.files ?? [], managed: raw?.managed ?? {} }
+    ? { root: null, files: raw, managed: {} }
+    : { root: raw?.root ?? null, files: raw?.files ?? [], managed: raw?.managed ?? {} }
 }

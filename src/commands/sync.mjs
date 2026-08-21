@@ -79,7 +79,7 @@ const prune = (root, previous, current, check) => {
   return stale
 }
 
-const emit = (adapter, check, stamp) => {
+const emit = (adapter, check, stamp, configRoot) => {
   const { name, root, files, patch, dropped } = adapter
   if (!exists(root)) return { name, installed: false }
 
@@ -94,7 +94,14 @@ const emit = (adapter, check, stamp) => {
 
   const patched = applyPatch(root, patch, prev, check)
   const stale = prune(root, prev.files, paths, check)
-  if (!check) write(join(root, MANIFEST), JSON.stringify({ files: paths.sort(), managed: patched.managed }, null, 2) + '\n')
+  // `root` here is the config repo, not the target: it is the only breadcrumb
+  // pointing from a rendered tree back to the source, which is what lets an
+  // agent reading a target dir find the repo it must edit instead.
+  if (!check)
+    write(
+      join(root, MANIFEST),
+      JSON.stringify({ root: configRoot, files: paths.sort(), managed: patched.managed }, null, 2) + '\n',
+    )
 
   return {
     name,
@@ -111,7 +118,7 @@ export const sync = (config, { check = false, only = [] } = {}) => {
   const ir = loadIR(config)
   const names = only.length ? only : config.targets
   const stamp = new Date().toISOString().replace(/[:.]/g, '-')
-  return adapters(names, ir).map(a => emit(a, check, stamp))
+  return adapters(names, ir).map(a => emit(a, check, stamp, config.root))
 }
 
 export const report = results =>
