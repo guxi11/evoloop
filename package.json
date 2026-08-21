@@ -1,9 +1,18 @@
 {
   "name": "evoloop",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Your config and your agents evolve each other, on a loop. One config repo, rendered into every AI CLI's native layout.",
   "type": "module",
   "license": "MIT",
+  "author": "guxi11",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/guxi11/evoloop.git"
+  },
+  "homepage": "https://github.com/guxi11/evoloop#readme",
+  "bugs": {
+    "url": "https://github.com/guxi11/evoloop/issues"
+  },
   "bin": {
     "evoloop": "bin/evoloop.mjs"
   },
