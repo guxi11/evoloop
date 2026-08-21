@@ -67,7 +67,9 @@ const SPECS = [
     skillsDir: 'skills',
     commandsDir: 'commands',
     agentsDir: 'agents',
-    patch: mcpJson('settings.json'),
+    // Claude Code reads user-scope MCP from ~/.claude.json, not ~/.claude/settings.json.
+    // Patch reaches up one level from the root.
+    patch: mcpJson(join('..', '.claude.json')),
   },
   {
     name: 'codex',
