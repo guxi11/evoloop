@@ -41,25 +41,37 @@ const SPECS = [
       close: '# <<< evoloop managed',
     }),
   },
-  // CodeBuddy CLI ships Gemini CLI's settings schema verbatim, so it is the same
-  // adapter with a different root and context filename.
-  ...[
-    ['codebuddy', join(HOME, '.codebuddy-cli'), 'CODEBUDDY.md'],
-    ['gemini', join(HOME, '.gemini'), 'GEMINI.md'],
-  ].map(([name, root, instruction]) => ({
-    name,
-    root,
-    instruction,
-    skillsDir: null, // no native skills slot; we skip rather than fake it
+  // CodeBuddy CLI: keeps MCP in its own top-level mcp.json (not settings.json),
+  // and hosts skills/commands/agents under ~/.codebuddy just like Claude.
+  {
+    name: 'codebuddy',
+    root: join(HOME, '.codebuddy'),
+    instruction: 'CODEBUDDY.md',
+    skillsDir: 'skills',
+    commandsDir: 'commands',
+    agentsDir: 'agents',
+    patch: ir => ({
+      file: 'mcp.json',
+      kind: 'json',
+      managed: { key: 'mcpServers', entries: ir.mcp },
+    }),
+  },
+  // Gemini CLI: no native skills slot; MCP goes into settings.json alongside
+  // contextFileName so the CLI picks up our instruction doc.
+  {
+    name: 'gemini',
+    root: join(HOME, '.gemini'),
+    instruction: 'GEMINI.md',
+    skillsDir: null,
     commandsDir: null,
     agentsDir: null,
     patch: ir => ({
       file: 'settings.json',
       kind: 'json',
       managed: { key: 'mcpServers', entries: ir.mcp },
-      merge: { contextFileName: instruction },
+      merge: { contextFileName: 'GEMINI.md' },
     }),
-  })),
+  },
 ]
 
 const instructionText = (ir, target) =>
