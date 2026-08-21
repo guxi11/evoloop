@@ -39,8 +39,9 @@ npx evoloop init
 ```
 
 That writes `evoloop.config.mjs`, the four source directories, an empty
-`mcp.json`, a `.gitignore` and the npm scripts — nothing else. The repo it
-creates holds your material only; evoloop itself stays a dependency.
+`mcp.json`, a `.gitignore`, the npm scripts, and seeds `skills/evoloop/SKILL.md`
+— the skill that teaches every agent on this machine how to edit the repo (see
+[Letting the agent drive](#letting-the-agent-drive)).
 
 `init` never overwrites a file that already exists, so it is safe to re-run on
 an existing repo to pick up whatever is missing. `--targets claude,codex`
@@ -125,10 +126,9 @@ the repo, clone it on your next machine, run `npm install && npm run sync`.
 
 ## Letting the agent drive
 
-evoloop ships its own skill. Every `sync` installs `skills/evoloop/SKILL.md`
-into each target that has a skills slot, whether or not your repo contains
-anything like it — the tool brings its interface, your repo brings the content.
-From then on the CLIs configured by the repo know how to change the repo:
+`init` seeds `skills/evoloop/SKILL.md` into your repo, and the next `sync`
+installs it into every target that has a skills slot. From then on the CLIs
+configured by the repo know how to change the repo:
 
 > **you:** add a rule that commit messages stay under 50 chars
 > **agent:** *(writes `rules/git.md`, runs `evoloop sync`)*
@@ -140,10 +140,10 @@ The skill's first instruction is the important one: **never edit a target
 directory** — those are build output. It finds your repo through the `root`
 breadcrumb every sync writes into `<target>/.evoloop-manifest.json`, so the two
 repos stay separable: evoloop is installed once, the config repo is whatever
-this machine happens to be bound to, and neither has to mention the other.
+this machine happens to be bound to, and the binding lives in neither.
 
-A repo skill named `evoloop` overrides the builtin, so you can replace the
-instructions wholesale if you disagree with them.
+Once seeded, the skill is yours — it lives in your repo like everything else, so
+edit it, restrict it with `targets:` frontmatter, or delete it.
 
 This is why there is no MCP server. The interface is already a CLI plus a git
 repo; a skill costs nothing at rest, ships through the pipeline evoloop already

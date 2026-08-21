@@ -1,6 +1,7 @@
 import { writeFileSync, mkdirSync, readFileSync, readdirSync } from 'node:fs'
-import { join, dirname, resolve } from 'node:path'
-import { exists, readIf } from '../util.mjs'
+import { join, dirname, resolve, relative } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { exists, readIf, walk } from '../util.mjs'
 
 const DIRS = ['rules', 'skills', 'commands', 'agents']
 
@@ -33,13 +34,31 @@ const configText = targets => `export default {
 // a keepfile — one that already has content does not.
 const bare = dir => !exists(dir) || readdirSync(dir).length === 0
 
+// Skills the package ships — currently the one that teaches an agent how to
+// drive evoloop. They are seeded into the repo rather than rendered straight
+// into the targets: the config repo is the accurate copy of everything a target
+// holds, and a skill the repo cannot show you is a skill you cannot edit.
+// Anchoring on import.meta.url is right here and nowhere else: these are the
+// package's own files, not sources of the repo being rendered.
+const SEEDS = fileURLToPath(new URL('../../skills', import.meta.url))
+
+// `sources.skills` is still the default at init time — it is this same run that
+// writes the config naming it.
+const seedSkills = () =>
+  walk(SEEDS).map(p => [join('skills', relative(SEEDS, p)), readFileSync(p)])
+
 // Paths are repo-relative; `init` joins them onto the root it resolved.
-const plan = (root, targets) => [
-  ['evoloop.config.mjs', configText(targets)],
-  ['mcp.json', '{}\n'],
-  ['.gitignore', 'node_modules/\n'],
-  ...DIRS.filter(d => bare(join(root, d))).map(d => [join(d, '.gitkeep'), '']),
-]
+const plan = (root, targets) => {
+  const seeds = seedSkills()
+  const filled = new Set(seeds.map(([rel]) => rel.split(/[/\\]/)[0]))
+  return [
+    ['evoloop.config.mjs', configText(targets)],
+    ['mcp.json', '{}\n'],
+    ['.gitignore', 'node_modules/\n'],
+    ...DIRS.filter(d => !filled.has(d) && bare(join(root, d))).map(d => [join(d, '.gitkeep'), '']),
+    ...seeds,
+  ]
+}
 
 const write = (p, content) => {
   mkdirSync(dirname(p), { recursive: true })
