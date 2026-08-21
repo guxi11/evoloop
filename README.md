@@ -1,10 +1,10 @@
 <p align="center">
-  <samp>one git repo&nbsp;&nbsp;──sync──▶&nbsp;&nbsp;~/.claude&nbsp;&nbsp;~/.codex&nbsp;&nbsp;~/.codebuddy&nbsp;&nbsp;~/.gemini&nbsp;&nbsp;──adopt──▶&nbsp;&nbsp;back home</samp>
+  <samp>one git repo&nbsp;&nbsp;──sync──▶&nbsp;&nbsp;~/.claude&nbsp;&nbsp;~/.codex&nbsp;&nbsp;~/.codebuddy&nbsp;&nbsp;~/.gemini&nbsp;&nbsp;+7&nbsp;&nbsp;──adopt──▶&nbsp;&nbsp;back home</samp>
 </p>
 
 <p align="center">
   <a href="https://www.npmjs.com/package/evoloop"><img src="https://img.shields.io/npm/v/evoloop?style=flat-square&color=black" alt="npm"></a>
-  <img src="https://img.shields.io/badge/targets-4-blue?style=flat-square" alt="targets">
+  <img src="https://img.shields.io/badge/targets-11-blue?style=flat-square" alt="targets">
   <img src="https://img.shields.io/badge/node-%E2%89%A520-green?style=flat-square" alt="node">
   <img src="https://img.shields.io/badge/deps-0-purple?style=flat-square" alt="dependencies">
   <img src="https://img.shields.io/badge/license-MIT-orange?style=flat-square" alt="license">
@@ -63,7 +63,7 @@ $ npx evoloop sync                    # codex has it now too
 
 |  | symlinks | copy-paste | evoloop |
 |---|---|---|---|
-| four tools, four layouts | breaks on the first disagreement | four copies drifting | rendered per target |
+| eleven tools, eleven layouts | breaks on the first disagreement | eleven copies drifting | rendered per target |
 | agent writes its own file into the tree | clobbered | lost | `adopt` brings it home |
 | target not installed on this machine | dangling link | — | skipped, never created |
 | which files are generated? | guess | guess | `.evoloop-manifest.json` |
@@ -73,10 +73,10 @@ Every AI CLI invented its own home directory, its own instruction file, its own 
 
 ## Look once and you can use it
 
-- ✓ `rules/*.md` — every file concatenated in sorted path order into `CLAUDE.md` / `AGENTS.md` / `CODEBUDDY.md` / `GEMINI.md`
+- ✓ `rules/*.md` — every file concatenated in sorted path order into `CLAUDE.md` / `AGENTS.md` / `CODEBUDDY.md` / `GEMINI.md` / `QWEN.md` / …
 - ✓ `skills/<name>/SKILL.md` — [agentskills.io](https://agentskills.io) layout; the directory name is the skill name, and everything beside it ships along, binaries included
 - ✓ `mcp.json` — the shape every client already uses; rewritten into `settings.json` or `config.toml` per target
-- ✓ `targets: [claude, codex]` frontmatter scopes any rule, skill, command or agent to a subset; absent means all four
+- ✓ `targets: [claude, codex]` frontmatter scopes any rule, skill, command or agent to a subset; absent means every target
 - ✗ Never edit `~/.claude` and friends — that is build output. Edit the repo, then `evoloop sync`
 
 ## Quick start
@@ -100,7 +100,8 @@ export default {
     agents: 'agents',
     mcp: 'mcp.json',
   },
-  targets: ['claude', 'codex', 'codebuddy', 'gemini'],
+  // targets: omitted means every target evoloop knows — one this machine has
+  // not installed is reported and skipped, never created.
 }
 ```
 
@@ -125,10 +126,23 @@ evoloop targets                         list known targets
 | `codex` | `~/.codex` | `AGENTS.md` | `skills/` | `prompts/` | — | `config.toml` |
 | `codebuddy` | `~/.codebuddy`&nbsp;\* | `CODEBUDDY.md` | `skills/` | `commands/` | `agents/` | `mcp.json` |
 | `gemini` | `~/.gemini` | `GEMINI.md` | — | — | — | `settings.json` |
+| `opencode` | `~/.config/opencode` | `AGENTS.md` | `skills/` | `commands/` | `agents/` | `opencode.jsonc`&nbsp;† |
+| `qwen` | `~/.qwen` | `QWEN.md` | `skills/` | `commands/` | `agents/` | `settings.json` |
+| `copilot` | `~/.copilot` | `copilot-instructions.md` | `skills/` | — | `agents/`&nbsp;‡ | `mcp-config.json` |
+| `factory` | `~/.factory` | `AGENTS.md` | `skills/` | `commands/` | `droids/` | `mcp.json` |
+| `grok` | `~/.grok` | `AGENTS.md` | `skills/` | `commands/` | `agents/` | `config.toml` |
+| `junie` | `~/.junie` | `AGENTS.md` | `skills/` | `commands/` | `agents/` | `mcp/mcp.json` |
+| `kimi` | `~/.kimi-code` | `AGENTS.md` | `skills/` | — | `agents/` | `mcp.json` |
 
 Codex has no notion of slash commands, so reusable prompts are the nearest slot. Anything a target has no slot for is reported in the sync output, never silently dropped.
 
 \* CodeBuddy shipped as `~/.codebuddy-cli` before `~/.codebuddy`. Roots are a candidate list probed in order — the first that exists wins, so either vintage is managed. With both present the newer path is used and the legacy directory is left frozen rather than double-managed.
+
+† OpenCode keys servers under `mcp`, splits local from remote, and folds argv into one `command` array. evoloop translates on the way out and back again on `adopt`, so `mcp.json` in your repo stays in the shape every other client uses. Its schema is closed, so this is the one target whose entries carry no `_managedBy` stamp — the manifest still records what evoloop wrote, so pruning is unaffected; what is lost is the ability to notice a server another tool has taken over, and evoloop never reclaims one there.
+
+‡ Copilot reads subagents as `<name>.agent.md`. `adopt` strips the suffix on the way home, so the repo keeps plain `.md`.
+
+The user-scope layouts above were verified against [rulesync](https://github.com/dyoshikawa/rulesync) (MIT) by rendering every target it knows into a sandboxed `HOME` and reading back the tree.
 
 ## The ownership model
 

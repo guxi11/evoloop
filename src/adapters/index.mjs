@@ -8,8 +8,57 @@ export const MANAGED_BY = 'evoloop'
 
 const HOME = homedir()
 
+// Most CLIs converged on the same shape: a JSON object of named servers, each
+// `{command, args, env}` or `{url}`. `managed` entries are prunable and stamped;
+// `merge` keys are never pruned.
+const mcpJson = (file, key = 'mcpServers', extra = {}) => ir => ({
+  file,
+  kind: 'json',
+  managed: { key, entries: ir.mcp },
+  ...extra,
+})
+
+// TOML cannot be safely deep-merged, so we own a marked region instead.
+const mcpToml = file => ir => ({
+  file,
+  kind: 'marked',
+  value: tomlTables('mcp_servers', ir.mcp),
+  open: '# >>> evoloop managed',
+  close: '# <<< evoloop managed',
+})
+
+// OpenCode keeps servers under `mcp`, splits local from remote by `type`, and
+// folds argv into a single `command` array. Its schema is closed
+// (`additionalProperties: false`), so this is also the one target we may not
+// stamp — see `stamp: false` below.
+const toOpencode = cfg =>
+  cfg.url
+    ? { type: 'remote', url: cfg.url, enabled: true, ...(cfg.headers ? { headers: cfg.headers } : {}) }
+    : {
+        type: 'local',
+        command: [cfg.command, ...(cfg.args ?? [])],
+        enabled: true,
+        ...(cfg.env ? { environment: cfg.env } : {}),
+      }
+
+const fromOpencode = cfg =>
+  cfg.type === 'remote'
+    ? { url: cfg.url, ...(cfg.headers ? { headers: cfg.headers } : {}) }
+    : {
+        command: cfg.command?.[0],
+        args: cfg.command?.slice(1) ?? [],
+        ...(cfg.environment ? { env: cfg.environment } : {}),
+      }
+
+const mapValues = (obj, f) => Object.fromEntries(Object.entries(obj).map(([k, v]) => [k, f(v)]))
+
 // Targets differ only in where things live and how their settings file is patched.
 // Everything else is one shared renderer.
+//
+// The user-scope layouts below were verified against dyoshikawa/rulesync (MIT),
+// by rendering every target it knows into a sandboxed HOME and reading back the
+// tree it produced. Paths are facts about other people's tools; rulesync is the
+// most thoroughly exercised record of them.
 const SPECS = [
   {
     name: 'claude',
@@ -18,12 +67,7 @@ const SPECS = [
     skillsDir: 'skills',
     commandsDir: 'commands',
     agentsDir: 'agents',
-    patch: ir => ({
-      file: 'settings.json',
-      kind: 'json',
-      // `managed` entries are prunable and stamped; `merge` keys are never pruned.
-      managed: { key: 'mcpServers', entries: ir.mcp },
-    }),
+    patch: mcpJson('settings.json'),
   },
   {
     name: 'codex',
@@ -32,14 +76,7 @@ const SPECS = [
     skillsDir: 'skills',
     commandsDir: 'prompts', // Codex has no commands; reusable prompts are the nearest slot
     agentsDir: null,
-    // TOML cannot be safely deep-merged, so we own a marked region instead.
-    patch: ir => ({
-      file: 'config.toml',
-      kind: 'marked',
-      value: tomlTables('mcp_servers', ir.mcp),
-      open: '# >>> evoloop managed',
-      close: '# <<< evoloop managed',
-    }),
+    patch: mcpToml('config.toml'),
   },
   // CodeBuddy CLI: keeps MCP in its own top-level mcp.json (not settings.json),
   // and hosts skills/commands/agents under its config dir just like Claude.
@@ -52,11 +89,7 @@ const SPECS = [
     skillsDir: 'skills',
     commandsDir: 'commands',
     agentsDir: 'agents',
-    patch: ir => ({
-      file: 'mcp.json',
-      kind: 'json',
-      managed: { key: 'mcpServers', entries: ir.mcp },
-    }),
+    patch: mcpJson('mcp.json'),
   },
   // Gemini CLI: no native skills slot; MCP goes into settings.json alongside
   // contextFileName so the CLI picks up our instruction doc.
@@ -67,12 +100,82 @@ const SPECS = [
     skillsDir: null,
     commandsDir: null,
     agentsDir: null,
+    patch: mcpJson('settings.json', 'mcpServers', { merge: { contextFileName: 'GEMINI.md' } }),
+  },
+  // OpenCode: a closed config schema rejects unknown keys, so our ownership
+  // stamp would make the file invalid. Pruning still works — the manifest, not
+  // the stamp, records what we wrote. What we lose is the ability to notice a
+  // server another tool has taken over, so we never claim one back here.
+  {
+    name: 'opencode',
+    roots: [join(HOME, '.config', 'opencode')],
+    instruction: 'AGENTS.md',
+    skillsDir: 'skills',
+    commandsDir: 'commands',
+    agentsDir: 'agents',
+    mcpFrom: fromOpencode,
     patch: ir => ({
-      file: 'settings.json',
+      file: 'opencode.jsonc',
       kind: 'json',
-      managed: { key: 'mcpServers', entries: ir.mcp },
-      merge: { contextFileName: 'GEMINI.md' },
+      stamp: false,
+      managed: { key: 'mcp', entries: mapValues(ir.mcp, toOpencode) },
     }),
+  },
+  {
+    name: 'qwen',
+    roots: [join(HOME, '.qwen')],
+    instruction: 'QWEN.md',
+    skillsDir: 'skills',
+    commandsDir: 'commands',
+    agentsDir: 'agents',
+    patch: mcpJson('settings.json'),
+  },
+  // Copilot CLI names subagents `<name>.agent.md`; a bare `.md` is ignored.
+  {
+    name: 'copilot',
+    roots: [join(HOME, '.copilot')],
+    instruction: 'copilot-instructions.md',
+    skillsDir: 'skills',
+    commandsDir: null,
+    agentsDir: 'agents',
+    agentsExt: '.agent.md',
+    patch: mcpJson('mcp-config.json'),
+  },
+  {
+    name: 'factory',
+    roots: [join(HOME, '.factory')],
+    instruction: 'AGENTS.md',
+    skillsDir: 'skills',
+    commandsDir: 'commands',
+    agentsDir: 'droids',
+    patch: mcpJson('mcp.json'),
+  },
+  {
+    name: 'grok',
+    roots: [join(HOME, '.grok')],
+    instruction: 'AGENTS.md',
+    skillsDir: 'skills',
+    commandsDir: 'commands',
+    agentsDir: 'agents',
+    patch: mcpToml('config.toml'),
+  },
+  {
+    name: 'junie',
+    roots: [join(HOME, '.junie')],
+    instruction: 'AGENTS.md',
+    skillsDir: 'skills',
+    commandsDir: 'commands',
+    agentsDir: 'agents',
+    patch: mcpJson(join('mcp', 'mcp.json')),
+  },
+  {
+    name: 'kimi',
+    roots: [join(HOME, '.kimi-code')],
+    instruction: 'AGENTS.md',
+    skillsDir: 'skills',
+    commandsDir: null,
+    agentsDir: 'agents',
+    patch: mcpJson('mcp.json'),
   },
 ]
 
@@ -81,7 +184,9 @@ const instructionText = (ir, target) =>
 
 const wanted = (items, target) => items.filter(i => wants(i.meta, target))
 
-const docFiles = (docs, dir) => docs.map(d => [`${dir}/${d.path}`, d.body])
+// A target may demand its own suffix (Copilot's `.agent.md`); `.md` otherwise.
+const docFiles = (docs, dir, ext = '.md') =>
+  docs.map(d => [`${dir}/${d.path.replace(/\.md$/, ext)}`, d.body])
 const skillFiles = (skills, dir) => skills.flatMap(s => s.files.map(f => [`${dir}/${f.rel}`, f.content]))
 
 export const render = (spec, ir) => {
@@ -109,7 +214,7 @@ export const render = (spec, ir) => {
       [spec.instruction, instructionText(ir, spec.name)],
       ...(spec.skillsDir ? skillFiles(pick.skills, spec.skillsDir) : []),
       ...(spec.commandsDir ? docFiles(pick.commands, spec.commandsDir) : []),
-      ...(spec.agentsDir ? docFiles(pick.agents, spec.agentsDir) : []),
+      ...(spec.agentsDir ? docFiles(pick.agents, spec.agentsDir, spec.agentsExt) : []),
     ]),
   }
 }

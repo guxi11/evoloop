@@ -51,7 +51,7 @@ const run = async () => {
   // Scaffolding runs before a config exists, so it never calls loadConfig.
   if (cmd === 'init') {
     const check = flags['dry-run'] === true
-    const result = init(positional[1], { targets: chosen.length ? chosen : specNames(), check })
+    const result = init(positional[1], { targets: chosen, check })
     console.log(initReport(result, check).join('\n'))
     if (!check) console.error('\nnext: npx evoloop sync')
     return

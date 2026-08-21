@@ -18,6 +18,9 @@ const SCRIPTS = {
 const selfVersion = () =>
   JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8')).version
 
+// An unnarrowed init leaves `targets` out entirely rather than freezing today's
+// list into the repo: absent means every target evoloop knows, so installing a
+// new CLI is enough to have it rendered into.
 const configText = targets => `export default {
   sources: {
     rules: 'rules',
@@ -26,8 +29,7 @@ const configText = targets => `export default {
     agents: 'agents',
     mcp: 'mcp.json',
   },
-  targets: [${targets.map(t => `'${t}'`).join(', ')}],
-}
+${targets.length ? `  targets: [${targets.map(t => `'${t}'`).join(', ')}],\n` : ''}}
 `
 
 // git cannot track an empty directory, so a source dir with nothing in it needs
@@ -103,7 +105,7 @@ export const init = (dir = process.cwd(), { targets = [], check = false } = {}) 
 
 export const initReport = ({ root, targets, created, kept, pkg }, check) => [
   `${check ? 'would init' : 'init'}  ${root}`,
-  `targets  ${targets.join(', ')}`,
+  `targets  ${targets.length ? targets.join(', ') : 'all known'}`,
   ...created.map(f => `  +  ${f}`),
   ...kept.map(f => `  =  ${f} (kept)`),
   `  ${pkg.action === 'unchanged' ? '=' : '+'}  ${pkg.file} (${pkg.action})`,

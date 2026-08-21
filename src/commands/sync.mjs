@@ -34,10 +34,15 @@ const patchJson = (before, patch, prevManaged) => {
   const foreign = n => existing[n]?._managedBy && existing[n]._managedBy !== MANAGED_BY
   const conflicts = Object.keys(entries).filter(foreign)
 
+  // A target with a closed schema rejects our stamp, so it goes in unmarked and
+  // the manifest alone records ownership. Conflict detection degrades there —
+  // nothing to read a foreign owner off — which is why `stamp: false` is opt-in
+  // per target rather than a global switch.
+  const mark = patch.stamp === false ? cfg => cfg : cfg => ({ ...cfg, _managedBy: MANAGED_BY })
   const stamped = Object.fromEntries(
     Object.entries(entries)
       .filter(([n]) => !foreign(n))
-      .map(([n, cfg]) => [n, { ...cfg, _managedBy: MANAGED_BY }]),
+      .map(([n, cfg]) => [n, mark(cfg)]),
   )
   // Drop only what we previously owned and no longer emit.
   const kept = Object.fromEntries(
@@ -88,11 +93,11 @@ const sweepMoved = (root, patch, prev, check) =>
         const section = acc[key]
         if (!section) return acc
         // Ours to reclaim only if we still hold the stamp; a name another tool
-        // took over in the meantime stays with them.
+        // took over in the meantime stays with them. An unstamped target never
+        // wrote a stamp to check, so the manifest is the whole story there.
+        const ours = cfg => patch?.stamp === false || cfg?._managedBy === MANAGED_BY
         const kept = Object.fromEntries(
-          Object.entries(section).filter(
-            ([n, cfg]) => !(names.includes(n) && cfg?._managedBy === MANAGED_BY),
-          ),
+          Object.entries(section).filter(([n, cfg]) => !(names.includes(n) && ours(cfg))),
         )
         return { ...acc, [key]: kept }
       }, JSON.parse(before))

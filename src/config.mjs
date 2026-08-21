@@ -1,12 +1,15 @@
 import { dirname, join, resolve, isAbsolute } from 'node:path'
 import { existsSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
+import { specNames } from './adapters/index.mjs'
 
 const CONFIG = 'evoloop.config.mjs'
 
+// Every known target by default: one a machine has not installed is reported and
+// skipped, so an opt-out list would only go stale the day a new CLI is installed.
 const DEFAULTS = {
   sources: { rules: 'rules', skills: 'skills', commands: 'commands', agents: 'agents', mcp: 'mcp.json' },
-  targets: ['claude', 'codex', 'codebuddy', 'gemini'],
+  targets: specNames(),
 }
 
 // Walk up from `start` looking for the config. This is the ONLY path anchor:

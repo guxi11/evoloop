@@ -12,8 +12,13 @@ import { readManifest } from '../manifest.mjs'
 const SLOTS = [
   { key: 'skills', dir: s => s.skillsDir, source: c => c.sources.skills, bundled: true },
   { key: 'commands', dir: s => s.commandsDir, source: c => c.sources.commands, bundled: false },
-  { key: 'agents', dir: s => s.agentsDir, source: c => c.sources.agents, bundled: false },
+  { key: 'agents', dir: s => s.agentsDir, source: c => c.sources.agents, bundled: false, ext: s => s.agentsExt },
 ]
+
+// Undo a target's private suffix so the repo keeps plain `.md`. Without this a
+// Copilot `planner.agent.md` comes home under that name and the next sync
+// renders `planner.agent.agent.md`.
+const unext = (rel, ext) => (ext && rel.endsWith(ext) ? `${rel.slice(0, -ext.length)}.md` : rel)
 
 // A skill is a directory of files; a command or agent is one file. Only the
 // display groups differently — copying is per-file either way, so a file added
@@ -30,28 +35,38 @@ const findable = (root, dir, owned) => {
         .map(rel => ({ from: join(root, rel), inSlot: relative(dir, rel) }))
 }
 
+const rehome = (f, slot, spec, source) => {
+  const rel = unext(f.inSlot, slot.ext?.(spec))
+  return { ...f, slot: slot.key, to: join(source, rel), unit: unitOf(rel, slot.bundled) }
+}
+
 const slotFindings = (spec, config, owned) =>
   SLOTS.flatMap(slot => {
     const dir = slot.dir(spec)
     const source = slot.source(config)
     if (!dir) return []
     return findable(spec.root, dir, owned)
-      .map(f => ({ ...f, slot: slot.key, to: join(source, f.inSlot), unit: unitOf(f.inSlot, slot.bundled) }))
+      .map(f => rehome(f, slot, spec, source))
       // Already in the repo: the file is vendored but this target has not been
       // synced since, so it is drift for `sync` to fix, not something to adopt.
       .filter(f => !exists(f.to))
   })
 
 // An entry we stamped is ours; one stamped by another tool is theirs; one with
-// no stamp at all was added by hand and has no home in any repo.
+// no stamp at all was added by hand and has no home in any repo. On a target we
+// cannot stamp, our own entries look handwritten — the `name in mine` test is
+// what keeps them from being adopted back on top of themselves.
 const serverFindings = (spec, config) => {
   const patch = spec.patch({ mcp: {} })
-  if (patch.kind !== 'json' || !patch.managed?.key) return []
+  if (patch?.kind !== 'json' || !patch.managed?.key) return []
   const obj = JSON.parse(readIf(join(spec.root, patch.file)) ?? '{}')
   const mine = JSON.parse(readIf(config.sources.mcp) ?? '{}')
+  // A target that reshapes servers on the way out must reshape them on the way
+  // back, or the repo fills up with one tool's private dialect.
+  const home = spec.mcpFrom ?? (cfg => cfg)
   return Object.entries(obj[patch.managed.key] ?? {})
     .filter(([name, cfg]) => !cfg?._managedBy && !(name in mine))
-    .map(([name, cfg]) => ({ slot: 'mcp', unit: name, server: cfg, to: config.sources.mcp }))
+    .map(([name, cfg]) => ({ slot: 'mcp', unit: name, server: home(cfg), to: config.sources.mcp }))
 }
 
 const copy = ({ from, to }) => {
