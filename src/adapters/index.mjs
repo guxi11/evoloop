@@ -219,13 +219,20 @@ export const render = (spec, ir) => {
   }
 }
 
-// Probe the candidates in order and take the first that exists. With none
-// present we hand back the canonical path, so `not installed, skipped` still
-// names the directory a fresh install would create.
-const resolveRoot = roots => roots.find(exists) ?? roots[0]
+// Fan out to every candidate root that exists — a target that shipped under
+// two names (CodeBuddy: `.codebuddy` and `.codebuddy-cli`) may have both
+// installs live, and picking one silently orphans the other. With none present
+// we still hand back the canonical path so `not installed, skipped` names the
+// directory a fresh install would create.
+const resolveRoots = roots => {
+  const found = roots.filter(exists)
+  return found.length ? found : [roots[0]]
+}
 
 export const specs = names =>
-  SPECS.filter(s => !names?.length || names.includes(s.name)).map(s => ({ ...s, root: resolveRoot(s.roots) }))
+  SPECS.filter(s => !names?.length || names.includes(s.name)).flatMap(s =>
+    resolveRoots(s.roots).map(root => ({ ...s, root })),
+  )
 
 export const adapters = (names, ir) => specs(names).map(s => render(s, ir))
 
